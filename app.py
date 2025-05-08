@@ -4,9 +4,9 @@ import pandas as pd
 import streamlit_authenticator as stauth
 
 # ----- USER AUTHENTICATION SETUP -----
-names = ['swati']
-usernames = ['swati']
-passwords = ['password']  # plaintext for demo
+names = ['John Doe']
+usernames = ['johndoe']
+passwords = ['12345']  # plain text, for demo only
 
 hashed_passwords = stauth.Hasher(passwords).generate()
 
@@ -17,7 +17,7 @@ authenticator = stauth.Authenticate(
             "password": hashed_passwords[0]
         }
     }},
-    "callcenter_app", "abcdef", cookie_expiry_days=1
+    "myapp", "abcdef", cookie_expiry_days=1
 )
 
 name, auth_status, username = authenticator.login('Login', 'main')
@@ -26,17 +26,17 @@ if auth_status:
     st.sidebar.success(f"Welcome, {name} 👋")
     authenticator.logout('Logout', 'sidebar')
 
-    # ----- Load model and encoder -----
+    # Load the model and encoder
     with open("xg_boost.pkl", "rb") as f:
         bundle = pickle.load(f)
         model = bundle["model"]
         encoder = bundle["encoder"]
         selected_features = bundle["selected_features"]
 
-    # ----- Streamlit UI -----
-    st.title("📞 Call Center Service Prediction")
+    # Streamlit UI
+    st.title("📞 Call Center Service Outcome Predictor")
 
-    st.markdown("### Enter Call Center Features:")
+    st.markdown("### Enter Call Details:")
 
     # Categorical inputs
     sector = st.selectbox("Sector", ["Finance", "Healthcare", "Retail", "Telecom"])
@@ -50,36 +50,38 @@ if auth_status:
     operator_id = st.number_input("Operator ID", step=1, min_value=1)
     satisfaction_score = st.slider("Satisfaction Score", 0.0, 1.0, step=0.01)
 
-    # ----- Prediction -----
-    if st.button("Predict"):
+    if st.button("Predict Outcome"):
         try:
-            # Build input dataframe
-            cat_data = {
+            # Prepare input data
+            categorical_data = {
                 "Sector": sector,
                 "Region": region,
                 "Day_Type": day_type,
                 "Complaint_Type": complaint_type
             }
 
-            num_data = {
+            numeric_data = {
                 "Call_Duration": call_duration,
                 "Customer_Age": customer_age,
                 "Operator_ID": operator_id,
                 "Satisfaction_Score": satisfaction_score
             }
 
-            cat_df = pd.DataFrame([cat_data])
-            num_df = pd.DataFrame([num_data])
+            cat_df = pd.DataFrame([categorical_data])
+            num_df = pd.DataFrame([numeric_data])
 
+            # Encode categorical columns
             encoded_cat = encoder.transform(cat_df)
             encoded_cat_df = pd.DataFrame(
                 encoded_cat.toarray(),
                 columns=encoder.get_feature_names_out()
             )
 
+            # Combine and select final input
             final_input = pd.concat([encoded_cat_df, num_df], axis=1)
             final_input = final_input[selected_features]
 
+            # Predict
             prediction = model.predict(final_input)
             st.success(f"📈 Predicted Outcome: {prediction[0]}")
 
