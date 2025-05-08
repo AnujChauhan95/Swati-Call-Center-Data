@@ -4,9 +4,9 @@ import pandas as pd
 import streamlit_authenticator as stauth
 
 # ----- USER AUTHENTICATION SETUP -----
-names = ['John Doe']
-usernames = ['johndoe']
-passwords = ['12345']  # plain text, for demo only
+names = ['swati']
+usernames = ['swati']
+passwords = ['password']  # plain text, for demo only
 
 hashed_passwords = stauth.Hasher(passwords).generate()
 
