@@ -1,37 +1,93 @@
 import streamlit as st
 import pickle
-import numpy as np
 import pandas as pd
+import streamlit_authenticator as stauth
 
-# Load the trained model
-@st.cache_resource
-def load_model():
+# ----- USER AUTHENTICATION SETUP -----
+names = ['swati']
+usernames = ['swati']
+passwords = ['password']  # plaintext for demo
+
+hashed_passwords = stauth.Hasher(passwords).generate()
+
+authenticator = stauth.Authenticate(
+    {"usernames": {
+        usernames[0]: {
+            "name": names[0],
+            "password": hashed_passwords[0]
+        }
+    }},
+    "callcenter_app", "abcdef", cookie_expiry_days=1
+)
+
+name, auth_status, username = authenticator.login('Login', 'main')
+
+if auth_status:
+    st.sidebar.success(f"Welcome, {name} 👋")
+    authenticator.logout('Logout', 'sidebar')
+
+    # ----- Load model and encoder -----
     with open("xg_boost.pkl", "rb") as f:
-        return pickle.load(f)
+        bundle = pickle.load(f)
+        model = bundle["model"]
+        encoder = bundle["encoder"]
+        selected_features = bundle["selected_features"]
 
-model = load_model()
+    # ----- Streamlit UI -----
+    st.title("📞 Call Center Service Prediction")
 
-st.title("📞 Call Center Prediction App")
+    st.markdown("### Enter Call Center Features:")
 
-st.markdown("Enter the details below to get the prediction from the trained XGBoost model.")
+    # Categorical inputs
+    sector = st.selectbox("Sector", ["Finance", "Healthcare", "Retail", "Telecom"])
+    region = st.selectbox("Region", ["North", "South", "East", "West"])
+    day_type = st.selectbox("Day Type", ["Weekday", "Weekend"])
+    complaint_type = st.selectbox("Complaint Type", ["Billing", "Technical", "General"])
 
-# --- Inputs ---
-customer_age = st.number_input("Customer Age", min_value=10, max_value=100, value=30)
+    # Numeric inputs
+    call_duration = st.number_input("Call Duration (in minutes)", step=1, min_value=0)
+    customer_age = st.number_input("Customer Age", step=1, min_value=10)
+    operator_id = st.number_input("Operator ID", step=1, min_value=1)
+    satisfaction_score = st.slider("Satisfaction Score", 0.0, 1.0, step=0.01)
 
-sector = st.selectbox("Sector", ["Finance", "Healthcare", "Retail", "Telecom"])
-sector_mapping = {"Finance": 0, "Healthcare": 1, "Retail": 2, "Telecom": 3}
-sector_encoded = sector_mapping[sector]
+    # ----- Prediction -----
+    if st.button("Predict"):
+        try:
+            # Build input dataframe
+            cat_data = {
+                "Sector": sector,
+                "Region": region,
+                "Day_Type": day_type,
+                "Complaint_Type": complaint_type
+            }
 
-operator_id = st.number_input("Operator ID", min_value=1, max_value=999, value=5)
-location_id = st.number_input("Location ID", min_value=1, max_value=999, value=101)
+            num_data = {
+                "Call_Duration": call_duration,
+                "Customer_Age": customer_age,
+                "Operator_ID": operator_id,
+                "Satisfaction_Score": satisfaction_score
+            }
 
-call_duration = st.slider("Call Duration (mins)", min_value=0, max_value=60, value=5)
-satisfaction_score = st.slider("Satisfaction Score (0.0 to 1.0)", min_value=0.0, max_value=1.0, step=0.01, value=0.5)
+            cat_df = pd.DataFrame([cat_data])
+            num_df = pd.DataFrame([num_data])
 
-# --- Construct input for model ---
-input_data = np.array([[customer_age, sector_encoded, operator_id, location_id, call_duration, satisfaction_score]])
+            encoded_cat = encoder.transform(cat_df)
+            encoded_cat_df = pd.DataFrame(
+                encoded_cat.toarray(),
+                columns=encoder.get_feature_names_out()
+            )
 
-# --- Predict ---
-if st.button("Predict"):
-    prediction = model.predict(input_data)
-    st.success(f"✅ Model Prediction: {prediction[0]}")
+            final_input = pd.concat([encoded_cat_df, num_df], axis=1)
+            final_input = final_input[selected_features]
+
+            prediction = model.predict(final_input)
+            st.success(f"📈 Predicted Outcome: {prediction[0]}")
+
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
+
+elif auth_status is False:
+    st.error("Username or password is incorrect")
+
+elif auth_status is None:
+    st.warning("Please enter your username and password")
