@@ -4,23 +4,32 @@ import pandas as pd
 import streamlit_authenticator as stauth
 
 # ----- USER AUTHENTICATION SETUP -----
-names = ['swati']
-usernames = ['swati']
-passwords = ['password']  # plain text, for demo only
 
-hashed_passwords = stauth.Hasher(passwords).generate()
+import streamlit_authenticator as stauth
+
+names = ['John Doe']
+usernames = ['johndoe']
+passwords = ['12345']  # Plaintext for demo only
+
+# Correct password hashing usage
+hashed_passwords = stauth.Hasher(['12345']).generate()
 
 authenticator = stauth.Authenticate(
-    {"usernames": {
-        usernames[0]: {
-            "name": names[0],
-            "password": hashed_passwords[0]
+    credentials={
+        "usernames": {
+            "johndoe": {
+                "name": "John Doe",
+                "password": hashed_passwords[0]
+            }
         }
-    }},
-    "myapp", "abcdef", cookie_expiry_days=1
+    },
+    cookie_name="myapp",
+    key="abcdef",
+    cookie_expiry_days=1
 )
 
-name, auth_status, username = authenticator.login('Login', 'main')
+name, auth_status, username = authenticator.login("Login", "main")
+
 
 if auth_status:
     st.sidebar.success(f"Welcome, {name} 👋")
